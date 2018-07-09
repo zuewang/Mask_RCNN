@@ -122,6 +122,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     ax.set_title(title)
 
     masked_image = image.astype(np.uint32).copy()
+
     for i in range(N):
         color = colors[i]
 
@@ -168,6 +169,74 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     if auto_show:
         plt.show()
 
+def mask_backgroud(image, mask, color, alpha=0.5):
+    """Apply the given mask to the image.
+    """
+    for c in range(3):
+        image[:, :, c] = np.where(mask == 0,
+                                  # image[:, :, c] *
+                                  # (1 - alpha) + alpha * color[c] * 255,
+                                  color[c] * 255,
+                                  image[:, :, c])
+    return image
+
+def display_bb(image, boxes, previous_mask, masks, class_ids, class_names, selected_class_name, color):
+    """
+    boxes: [num_instance, (y1, x1, y2, x2, class_id)] in image coordinates.
+    masks: [height, width, num_instances]
+    class_ids: [num_instances]
+    class_names: list of class names of the dataset
+    scores: (optional) confidence scores for each box
+    title: (optional) Figure title
+    show_mask, show_bbox: To show masks and bounding boxes or not
+    figsize: (optional) the size of the image
+    colors: (optional) An array or colors to use with each object
+    captions: (optional) A list of strings to use as captions for each object
+    """
+    # Number of instances
+    N = boxes.shape[0]
+    if not N:
+        print("\n*** No instances to display *** \n")
+    else:
+        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+
+    if color == None:
+        # default blue
+        color = [0.0, 0.0, 1.0]
+
+
+    # Show area outside image boundaries.
+    height, width = image.shape[:2]
+
+    masked_image = image.astype(np.uint32).copy()
+
+    # entire mask masking all detected objects
+    total_mask = np.zeros(
+            (masks.shape[0], masks.shape[1]), dtype=np.uint8)
+
+    num_selected_instance = 0
+
+    for i in range(N):
+        class_id = class_ids[i]
+        class_name = class_names[class_id]
+        # only include selected class
+        if class_name == selected_class_name:
+            num_selected_instance += 1
+            mask = masks[:, :, i]
+            # union of mask
+            total_mask = total_mask | mask
+    
+    # if no selected instance detected, use the mask in the previous frame and return it as output
+    if num_selected_instance == 0:
+        print('no selected instance detected')
+        if not previous_mask is None:
+            print('use mask in the previous frame')
+            total_mask = previous_mask
+    
+    # Mask
+    masked_image = mask_backgroud(masked_image, total_mask, color)
+
+    return masked_image, total_mask
 
 def display_differences(image,
                         gt_box, gt_class_id, gt_mask,
